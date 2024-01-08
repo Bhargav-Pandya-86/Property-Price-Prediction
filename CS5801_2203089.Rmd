@@ -1,0 +1,1094 @@
+---
+title: "Property Price Prediction"
+author: 'Bhargav Pandya'
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+  html_notebook: default
+version: 1
+---
+
+
+
+
+
+
+
+```{r}
+# install.packages("installr")
+# 
+# library(installr)
+# 
+# updateR()
+
+
+# install.packages('devtools')     # comment this line if already installed
+library(skimr)                  # load library
+library(tidyverse)              # load library
+library(validate)
+library(stringr)
+
+```
+
+
+# 1. Organise and clean the data
+
+## 1.1 Subset the data into the specific dataset allocated
+ 
+```{r}
+# Assign your student id into the variable SID, for example:
+SID <- 2203089                  # replaced with my student ID 2203089
+SIDoffset <- (SID %% 100) + 1    # Your SID mod 100 + 1
+
+load("house-analysis.RDa")
+# Now subset the housing data set
+# Pick every 100th observation starting from your offset
+# Put into your data frame named mydf (you can rename it)
+originalDF <- house.analysis[seq(from=SIDoffset,to=nrow(house.analysis),by=100),]
+```
+
+
+## 1.2 Data quality analysis
+ 
+ At First, I will make user define function to for every "quality check", and then I will call those quality check functions. Main purpose of following this method is that I can re-use same code in future projects. 
+ 
+To access the quality of data I would follow following plan and steps.
+
+(1) Initially, I will take back up Original data frame (originalDF) and process on new dataframe (newdf) before continuing. The main purpose of doing this is, Our original data will remain untouched as a backup in the "originalDF" data frame. It is regarded as a good practise.
+
+
+
+(2) Then, I will just take overview of data before data cleaning using skim() function from skimr library. I know, skim() does not work well with NA and NAN values, before data cleaning, but it is a good practice to take overview of data before start working.
+
+
+
+(3) **Integrity check** 
+Then, I will make user define function for "Integrity check", to make sure all columns in dataframe follows integrity critaria. I will use validator function from validate library for that. I will make sure that data must follow following rule book.
+
+Rule book:- 
+
+(1) 'heating' column must have only 2 types of values 'autonomous' and 'other'
+(2)  Price must be grater than 0 (zero).
+(3)  mq column (area) must be grater than 0 (zero).
+(4)  floors must be grater than 0 (zero).
+(5)  number of rooms (n_rooms) must be grater than 0 (zero).
+(6)  number of bathrooms (n_bathrooms) must have non negative value. 
+(7)  'has_terrace' column must have either "0" or "1" value.
+(8)  'has_alarm' column must have either "0" or "1" value.
+(9)  'has_air_conditioning' column must have either "0" or "1" value.
+(10) 'has_parking' column must have either "0" or "1" value.
+(11) 'is_furnished' column must have either "0" or "1" value.
+
+
+(4) *Missing value check*
+To perform an accurate and objective analysis, I must remove all NA and NAN values from the data frame. I will therefore add a missing value check for each column.
+
+If a NA or NAN values exists in a dataset, it can be handled in a variety of ways, including deleting the rows (observations) or imputation technique applying the mean (avarage value), median (mid point value), or mode (most common value) value to that observation.
+
+Situation to apply Mean, median and mode :-
+
+(1) Mean :- It is preferred if data is numeric and not skewed. But drawback is, outliers has severe impacts on mean value. We have to consider outliers factor before applying mean value as a replacement of NA and NAN value.
+
+(2) Median :- It is preferred if data is numeric and skewed.
+
+(3) Mode :- It is preferred if the data is a string(object) or numeric.
+
+In this data frame, 903 rows are available. Therefore, if few NA values exists, I will choose 'remove' option for that. If the dataset contains many missing values, I would replace with the mean value of that column. 
+
+
+
+(5) **Uniqueness check**
+
+I will make function for checking duplicate rows in dataframe..
+
+
+(6) **Variable type check**
+I will check class of all columns name in our dataframe. This step is important for data analysis. 
+
+
+(7) **Accuracy Check**
+There are several different methods for identifying and removing outliers in a data set, like removing values which is above 3 standard deviations from mean value or Boxplot can be used to identify outliers or we can put cap values on certain threshold. For that, I have chosen 5000 for lower cap and 1000000 for upper cap for price column.
+
+ In real life scenario, I would discuss this with client or domain expert before taking decision. In our case, I will remove outliers of price column.
+
+
+
+(8) **Special character Check**
+
+I will Check that any special character exist or not in any columns using this check, for that 
+I will use stringr library for that.
+
+
+(9) **Quality Check for area (mq)**
+According to me, property area which has less than 25 value (mq) should not exist. So, I will remove those rows which has less than 25 value in mq column.
+
+
+(10) Then, I will start implement all checks by calling all user define function one by on. I will also convert blank values "" in to NA before implementing missing value check.
+
+
+
+
+**Taking back up the data**
+```{r}
+newdf <- originalDF # taking back up of data frame
+dim(newdf) # returns the dimension (number of rows and columns) of data frame
+head(newdf, 5)     # visualize top 5 rows
+```
+
+
+\
+
+
+**Skimming the data and getting summary**
+```{r}
+skim(newdf)
+```
+
+
+\
+
+**Display all column names in data frame.**
+```{r}
+colnames(newdf)
+```
+
+
+\
+
+
+**Integrity check**
+```{r}
+integrity.rules <- validator(okHeating = is.element(heating,c("autonomous","other")),
+                             NonNegPrice = price > 0,
+                             NonNegMq = mq > 0,
+                             NonNegFloor = floor > 0,
+                             NonNegNrooms = n_rooms > 0,
+                             NonNegNbathrooms = n_bathrooms >= 0,
+                             OKNegTerrace = is.element(has_terrace,c("0","1")),
+                             OkNegAlarm = is.element(has_alarm,c("0","1")),
+                             OkNegAirconditioning = is.element(has_air_conditioning,c("0","1")),
+                             OkNegParking = is.element(has_parking,c("0","1")),
+                             OkNegfurnished = is.element(is_furnished,c("0","1"))
+                         )
+```
+
+
+
+\
+
+
+*Missing value check*
+```{r}
+missing.rules <- validator(
+                           missing.NA_price = !is.na(price),
+                           missing.NAN_price = !is.nan(price),
+                           
+                           missing.NA_mq = !is.na(mq),
+                           missing.NAN_mq = !is.nan(mq),
+                           
+                           missing.NA_floor = !is.na(floor),
+                           missing.NAN_floor = !is.nan(floor),
+                           
+                           missing.NA_n_rooms = !is.na(n_rooms),
+                           missing.NAN_n_rooms = !is.nan(n_rooms),
+                           
+                           missing.NA_n_bathrooms = !is.na(n_bathrooms),
+                           missing.NAN_n_bathrooms = !is.nan(n_bathrooms),
+                           
+                           missing.NA_has_terrace = !is.na(has_terrace),
+                           missing.NAN_has_terrace = !is.nan(has_terrace),
+                           
+                           missing.NA_has_alarm = !is.na(has_alarm),
+                           missing.NAN_has_alarm = !is.nan(has_alarm),
+                           
+                           missing.NA_heating = !is.na(heating),
+                           missing.NAN_heating = !is.nan(heating),
+                           
+                           missing.NA_has_air_conditioning = !is.na(has_air_conditioning),
+                           missing.NAN_has_air_conditioning = !is.nan(has_air_conditioning),
+                           
+                           missing.NA_has_parking = !is.na(has_parking),
+                           missing.NAN_has_parking = !is.nan(has_parking),
+                           
+                           missing.NA_is_furnished = !is.na(is_furnished),
+                           missing.NAN_is_furnished = !is.nan(is_furnished)
+)   
+```
+
+
+\
+
+
+**Uniqueness check**
+```{r}
+unique_check <- function(data) {
+  duplicates <- duplicated(data)
+  unique_data <- data[!duplicates, ]
+  return(unique_data)
+}
+
+```
+
+
+
+\
+
+
+**Variable type check**
+
+```{r}
+variabletype.rule <- validator(
+    variable_price = is.numeric(price),
+    variable_mq = is.numeric(mq),
+    
+    variable_floor = is.factor(floor),
+    variable_n_rooms = is.factor(n_rooms),
+    variable_n_bathrooms = is.factor(n_bathrooms),
+    variable_has_terrace = is.factor(has_terrace),
+    variable_has_alarm = is.factor(has_alarm),
+    variable_heating = is.factor(heating),
+    variable_has_air_conditioning = is.factor(has_air_conditioning),
+    variable_has_parking = is.factor(has_parking),
+    variable_is_furnished = is.factor(is_furnished)
+)
+
+```
+
+
+
+\
+
+
+
+**Accuracy Check**
+```{r}
+remove_outliers_cap <- function(data, upper_threshold, lower_threshold) {
+  # Identify the outliers as data points above the upper threshold or below the lower threshold
+  outliers <- newdf[newdf$price > upper_threshold | newdf$price < lower_threshold, ]
+  
+  
+  # Cap the values at the thresholds
+  newdf$price[newdf$price > upper_threshold] <- upper_threshold
+  newdf$price[newdf$price < lower_threshold] <- lower_threshold
+  
+  
+  # Remove the outliers from the data set
+  filtered_data <- newdf[newdf$price >= lower_threshold & newdf$price <= upper_threshold, ]
+  
+  
+  return(filtered_data)  # Return the data set without the outliers
+}
+
+```
+
+
+
+\
+
+
+**Checking any special character exist or not in columns**
+```{r}
+check_special_characters <- function(data, columns) {
+ 
+  # Initialize a list to store the results
+  results <- list()
+  
+  # Loop through each column
+  for (col in columns) {
+    # Check if any values in the column contain a special character
+    special_characters_mask <- str_detect(data[, col], "[^[:alnum:]]")
+    
+    # Check if any values were identified as containing a special character
+    if (any(special_characters_mask)) {
+      results[[col]] <- "Special characters found in column."
+    } else {
+      results[[col]] <- "No special characters found in column."
+    }
+  }
+  
+  # Return the results
+  return(results)
+}
+
+```
+ 
+
+
+\
+
+
+ 
+**Implementing data cleaning**
+
+**Now, converting blank data "" into NA in each column.**
+```{r}
+newdf["id"][newdf["id"] == ''] <- NA
+newdf["price"][newdf["price"] == ''] <- NA
+newdf["mq"][newdf["mq"] == ''] <- NA
+newdf["floor"][newdf["floor"] == ''] <- NA
+newdf["n_rooms"][newdf["n_rooms"] == ''] <- NA
+newdf["n_bathrooms"][newdf["n_bathrooms"] == ''] <- NA
+newdf["has_terrace"][newdf["has_terrace"] == ''] <- NA
+newdf["has_alarm"][newdf["has_alarm"] == ''] <- NA
+newdf["heating"][newdf["heating"] == ''] <- NA
+newdf["has_air_conditioning"][newdf["has_air_conditioning"] == ''] <- NA
+newdf["has_parking"][newdf["has_parking"] == ''] <- NA
+newdf["is_furnished"][newdf["is_furnished"] == ''] <- NA
+```
+ 
+
+
+\
+
+
+
+
+**Integrity check**
+```{r}
+qualcheck_integrity <-confront(newdf,integrity.rules) 
+summary(qualcheck_integrity)
+plot(qualcheck_integrity, xlab = "Integrity check validation result.")
+```
+3 columns have failed in integrity check (1)Heating (2)mq (3) n_rooms. 
+
+
+
+
+\
+
+
+
+**Missing value check**
+
+```{r}
+qualcheck_missing <-confront(newdf,missing.rules) 
+summary(qualcheck_missing)
+plot(qualcheck_missing, xlab = "Missing check validation result.")
+```
+There are no NA and NAN values in dataframe.
+
+
+\
+
+
+**Uniqueness check**
+```{r}
+cat("number of unique rows before unique_check test = ",  nrow(newdf), "\n")
+newdf <- unique_check(newdf)
+cat("number of unique rows after unique_check test = ",  nrow(newdf))
+```
+There are no duplicate rows available in our dataframe newdf.
+
+
+
+\
+
+
+
+**Variable type check**
+```{r}
+qualcheck_variabletype <-confront(newdf,variabletype.rule) 
+
+summary(qualcheck_variabletype)
+
+plot(qualcheck_variabletype, xlab = "Variable type check validation result.")
+
+```
+As per above result 9 columns (is_furnished, has_terrace,has_alarm, heating,  has_air_conditioning, has_parking, n_bathrooms, n_rooms, floor) have failed variable class test. 
+
+
+
+\
+
+
+
+**Accuracy Check**
+I have put lower cap of 5000 and upper cap of 1000000 on price to maintain accuracy of housing price.
+```{r}
+Outliers_price <- remove_outliers_cap(newdf, 5000, 1000000)
+nrow(Outliers_price)
+```
+There is no property exist which has price below 5000 or above 1000000. All records has passed accuracy check. So, I don't need to remove any outliers from property column.
+ 
+ 
+
+\
+
+
+
+**Checking frequency of all columns which has Categorical or ordinal data**
+```{r}
+table(newdf$floor)
+
+table(newdf$n_rooms)
+
+table(newdf$n_bathrooms)
+
+table(newdf$has_terrace)
+
+table(newdf$has_alarm)
+
+table(newdf$heating)
+
+table(newdf$has_air_conditioning)
+
+table(newdf$has_parking)
+
+table(newdf$is_furnished)
+
+```
+
+
+
+/
+
+
+**Quality check for area (mq)**
+```{r}
+faulty_mq <- newdf[newdf$mq < 25, ]  # area (mq) less than 25 will be filtered
+faulty_mq
+```
+
+
+
+ 
+ 
+## 1.3 Data cleaning  
+
+**Result Summary of Quality check analysis**
+
+Below is the list of quality issue found in dataframe.
+
+(1) 3 columns have failed in integrity check (1)Heating (2)mq (3) n_rooms.
+
+(2) Heating column has 1 data entry error (Spelling mistake). 1 Row has wrong spelling "autonamous" rather than actual spelling "autonomous". 
+
+(3) n_rooms column has 1 wrong data entry of "-1". Number of room can not be negative number. 
+
+(4) mq (area) column has 2 rows which has less than 25 value. According to me, that is not possible, in real life scenario. 
+
+(5) 6 columns (has_terrace,has_alarm, heating,  has_air_conditioning, has_parking) have failed variable class test. 
+
+
+
+\
+
+
+
+**Solving Data Quality Issue**
+
+(1) I will Convert (update) 'autonamous' value in to 'autonomous', in 'heating' column.
+
+(2) I will remove 2 records which has less than 25 value in mq (area) column.
+
+(3) I will remove 1 record which has negative value in n_rooms column.
+
+(4) I will converts column type as "factor" in 9 columns (is_furnished, has_terrace,has_alarm, heating,  has_air_conditioning, has_parking, n_bathrooms, n_rooms, floor).
+
+
+
+
+Convert 'autonamous' value in to 'autonomous', in 'heating' variable.
+```{r}
+newdf$heating[which(newdf$heating == "autonamous")] = "autonomous"
+table(newdf$heating)
+```
+
+
+\
+
+Removing rows with "mq" records below 25
+```{r}
+newdf <- newdf[newdf$mq >= 25 , ]  # remove rows which has less than 25 mq
+nrow(newdf)
+Sorted_mq <- newdf   
+Sorted_mq <-Sorted_mq[order(Sorted_mq$mq),] # sorted data according to mq
+head(Sorted_mq$mq)  # sorted mq column after removing values less than 25
+```
+
+
+
+removing rows with negative n_rooms value.
+```{r}
+newdf <- newdf[newdf$n_rooms > 0, ]  # remove rows which has less than 1 rooms
+
+table(newdf$n_rooms)
+nrow(newdf)
+
+```
+
+
+
+\
+
+
+```{r}
+newdf$has_terrace = as.factor(newdf$has_terrace)
+
+newdf$has_alarm = as.factor(newdf$has_alarm)
+
+newdf$heating = as.factor(newdf$heating)
+
+newdf$has_air_conditioning = as.factor(newdf$has_air_conditioning)
+
+newdf$has_parking = as.factor(newdf$has_parking)
+
+newdf$is_furnished = as.factor(newdf$is_furnished)
+
+newdf$n_bathrooms = as.factor(newdf$n_bathrooms)
+
+newdf$n_rooms = as.factor(newdf$n_rooms)
+
+newdf$floor = as.factor(newdf$floor)
+```
+
+
+
+\
+
+
+After data cleaning, let's pass our data frame 'newdf' from 'validator' function, once again, and apply 'integrity.rules' to 'newdf' data frame.
+```{r}
+qualcheck_integrity2 <-confront(newdf,integrity.rules) 
+summary(qualcheck_integrity2)
+plot(qualcheck_integrity2, xlab = "Integrity check validation result.")
+```
+
+
+
+**There are 900 rows remaining after completion of data cleaning.**
+
+
+
+
+
+
+# 2. Exploratory Data Analysis (EDA)
+
+## 2.1 EDA plan
+
+In this section, I will check co-relation of price with other variable, and then I will use various plots like histogram, scatter plot, barplot and boxplot to understand data distribution and relation between variables. 
+
+A histogram is a graph that shows the frequency of data within specific ranges or bins. It is used to visualize the distribution of continuous variables.
+
+A scatter plot is a graph that shows the relationship between two continuous variables. It is used to visualize the relationship between two variables and see if there is a pattern or trend.
+
+A bar plot is a graph that shows the frequency of data in categories or groups. It is used to compare the frequency of different categories or to compare the proportions of different categories.
+
+
+The box in the box plot represents the interquartile range, which is the range of values between the first quartile (Q1) and the third quartile (Q3). The median (Q2) is represented by a line within the box. The whiskers of the plot extend from the box to the minimum and maximum values, and any outliers are represented by individual points.
+
+
+**Testing Correlation of price with mq columns.**
+
+Test correlation between Price and mq(area)
+
+$H_0: \rho=0$ vs $H_1:\rho \ne 0$
+
+```{r}
+cor.test(newdf$price, newdf$mq)
+```
+Result shows that p-value < 2.2e-16. We reject the Null Hypothesis. These two variables are correlated (considering alpha = 0.05). Cor value is 0.4035036. It means they are weakly positively co related. 
+
+
+We can use scatter plot to visualized this relationship.
+
+**Scatter Plot**
+
+**Scatter plot of Property Price and Area(mq))**
+
+```{r}
+ggplot(newdf, aes(price, mq, color = mq)) +
+  geom_point(shape = 16, size = 5, show.legend = FALSE) +
+  theme_minimal() +
+  scale_color_gradient(low = "#0091ff", high = "#f0650e") + ggtitle("Scatter plot of Property Price and Area(mq))")
+```
+
+
+
+\
+
+
+
+**Scatter plot of log(Price) and log(Area(mq))**
+```{r}
+ggplot(newdf, aes(log(price), log(mq), color = mq)) +
+  geom_point(shape = 16, size = 5, show.legend = FALSE) +
+  theme_minimal() +
+  scale_color_gradient(low = "#0091ff", high = "#f0650e") + ggtitle("Scatter plot of log(Price) and log(Area(mq))")
+```
+
+
+
+
+\
+
+
+
+**Histogram**
+
+**Histogram of Price**
+```{r}
+
+p <- ggplot(newdf, aes(x = price, fill = cut(price, 100))) +
+  geom_histogram(show.legend = FALSE) +
+  theme_minimal() +
+  labs(x = "Price", y = "count") +
+  ggtitle("Histogram of Price")
+
+p + scale_fill_discrete(h = c(180, 360), c = 150, l = 80)
+
+```
+
+
+
+\
+
+
+
+**Histogram of Price after convert price in log**
+```{r}
+
+p <- ggplot(newdf, aes(x = log(price), fill = cut(price, 100))) +
+  geom_histogram(show.legend = FALSE) +
+  theme_minimal() +
+  labs(x = "Price", y = "count") +
+  ggtitle("Histogram of log(Price)")
+
+p + scale_fill_discrete(h = c(180, 360), c = 150, l = 80)
+
+```
+
+
+
+\
+
+
+
+**Histogram of area (mq)**
+```{r}
+p <- ggplot(newdf, aes(x = mq, fill = cut(price, 100))) +
+  geom_histogram(show.legend = FALSE) +
+  theme_minimal() +
+  labs(x = "Mq(Area)", y = "count") +
+  ggtitle("Histogram of Mq (Area)")
+
+p + scale_fill_discrete(h = c(180, 360), c = 150, l = 80)
+```
+
+
+
+\
+
+
+
+
+**Histogram of mq(area) after convert mq(area) in log**
+```{r}
+p <- ggplot(newdf, aes(x = mq, fill = cut(price, 100))) +
+  geom_histogram(show.legend = FALSE) +
+  theme_minimal() +
+  labs(x = "Price", y = "count") +
+  ggtitle("Histogram of log(mq(area))")
+
+p + scale_fill_discrete(h = c(180, 360), c = 150, l = 80)
+```
+
+
+
+\
+
+
+**Bar Plot**
+
+
+**Bar plot of log(Price) and n_rooms**
+```{r}
+ggplot(newdf, aes(x = n_rooms, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and n_rooms")
+```
+
+
+
+
+\
+
+
+**Bar plot of log(Price) and has_parking**
+```{r}
+ggplot(newdf, aes(x = has_parking, y = log(price), fill = has_parking)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and has_parking")
+```
+
+
+
+
+\
+
+
+**Bar plot of log(Price) and n_bathrooms**
+```{r}
+ggplot(newdf, aes(x = n_bathrooms, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and n_bathrooms")
+```
+
+
+
+\
+
+
+
+**Bar plot of log(Price) and has_alarm**
+```{r}
+ggplot(newdf, aes(x = has_alarm, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and has_alarm")
+```
+
+
+
+
+\
+
+
+
+
+**Bar plot of log(Price) and heating**
+```{r}
+ggplot(newdf, aes(x = heating, y = log(price), fill = heating )) +
+  geom_col() + ggtitle("Bar plot of log(Price) and heating")
+```
+
+
+\
+
+
+
+**Bar plot of log(Price) and has_air_conditioning**
+```{r}
+ggplot(newdf, aes(x = has_air_conditioning, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and has_air_conditioning")
+```
+
+
+
+
+
+**Bar plot of log(Price) and has_parking**
+```{r}
+ggplot(newdf, aes(x = has_parking, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and has_alarm")
+```
+
+
+
+
+\
+
+
+
+**Bar plot of log(Price) and has_terrace**
+```{r}
+ggplot(newdf, aes(x = has_terrace, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and has_terrace")
+
+```
+
+
+
+\
+
+
+
+**Bar plot of log(Price) and has_terrace**
+```{r}
+ggplot(newdf, aes(x = has_terrace, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and has_terrace")
+
+```
+
+
+
+\
+
+
+
+**Bar plot of log(Price) and is_furnished**
+```{r}
+
+ggplot(newdf, aes(x = is_furnished, y = log(price), fill = heating)) +
+  geom_col() + ggtitle("Bar plot of log(Price) and is_furnished")
+```
+
+
+
+\
+
+
+
+**Box Plot**
+
+**Box plot of log(Price) and n_rooms**
+```{r}
+
+ggplot(newdf, aes(x = n_rooms, y = log(price), color = is_furnished)) +
+  geom_boxplot() +
+  scale_color_manual(values = c("#0073C2FF", "#e74c3c", "#2ecc71")) + ggtitle("Box plot of log(Price) and n_rooms")
+
+```
+
+
+
+\
+
+
+
+**Box plot of log(Price) and is_furnished**
+```{r}
+
+ggplot(newdf, aes(x = heating, y = log(price), color = n_rooms)) +
+  geom_boxplot() +
+  scale_color_manual(values = c("#0073C2FF", "#e74c3c", "#2ecc71", "#bcbd22")) + ggtitle("Box plot of log(Price) and is_furnished")
+
+```
+
+
+\
+
+
+
+## 2.2 EDA and summary of results  
+
+
+**Findings of your data exploration**
+
+(1) Price data is left skewed and Mq data is right skewed distributed.
+
+
+(2) Price and MQ (area) has positive co-Relation, as per Scatter plot of Property Price and Area(mq) and as per Scatter plot of log(Price) and log(Area(mq).
+
+(3) number of rooms 3 has more property price compare to others, following by number of rooms 4, number of 2 and then number of rooms 5, as per Bar plot of log(Price) and n_rooms.
+
+(4) Majority property has autonomous heating than others. Almost, all barplots supports this statement.
+
+(5) Box plot of log(Price) and n_rooms indicates 3 outliers in 3 room unfurnished property price, 3 outliers in 4 room unfurnished property price, and 2 outliers in 5 room unfurnished property price value.
+
+(6) Box plot of log(Price) and is_furnished indicates 2 outliers in 2 rooms property price in autonomous heating, 3 outliers in 3 rooms property price in autonomous heating, and 3 outliers in 4 rooms property price in autonomous heating.
+
+
+
+\
+
+
+
+
+## 2.3 Additional insights and issues
+
+As property data is left skewed, we have to convert in to log values. Moreover, I find few outliers using boxplot, which was missed earlier. 
+
+
+
+# 3. Modelling
+
+## 3.1 Explain your analysis plan
+
+I will Build 3 models to predict property prices and based of analysis of output of them, I will finalise my model. I will use maximal model, minimal adequate model using step function and a model in which dependent variable price will be converted in to log value for transformation, and then it will be used in model.
+
+After then, I will Evaluate the model and finally, write findings of them.
+
+
+## 3.2 Build a model for property price
+
+Using the continuous explanatory variables decide on a maximal model
+
+Converting type in to numeric from factor, before using in modeling.
+```{r}
+newdf$n_bathrooms = as.numeric(newdf$n_bathrooms)
+newdf$floor = as.numeric(newdf$floor)
+newdf$n_rooms = as.numeric(newdf$n_rooms)
+newdf$is_furnished = as.numeric(newdf$is_furnished)
+```
+
+\
+
+**Model 1**
+```{r}
+property_price.lm<-lm(newdf$price~newdf$mq+newdf$n_rooms+newdf$n_bathrooms+newdf$floor+newdf$is_furnished)
+
+summary(property_price.lm) #maximal model
+```
+Model 1 has R-squared:  0.2448, F-statistic: 57.94, p-value: < 2.2e-16
+Model 1 can be considered as good model.
+
+
+
+**Using model selection approach to achieve a minimal adequate model using step function**
+
+Initially I will use all the continuous variables as explanatory variables as my starting maximal model. Then use the step function
+
+```{r}
+step(property_price.lm)
+```
+The step function has ended with this minimal adequate model with the lowest AIC value that is 20517.09.
+
+\
+
+ newdf$price ~ newdf$mq + newdf$n_rooms + newdf$n_bathrooms + newdf$floor
+ 
+ 
+
+$$Price = 11691.3 + 332.9\times mq\ (area) + 7844.9 \times \ number \ of \ rooms   + 47185.7 \times \ number \ of \ bathroom   + 4994.8 \times \ number \ of \ floor  $$
+  
+
+\
+
+**Model 2**
+
+```{r}
+min_property_price.lm<-lm(formula = newdf$price ~ newdf$mq + newdf$n_rooms + newdf$n_bathrooms + newdf$floor)
+summary(min_property_price.lm)
+```
+Based on the model summary for minimal adequate model (min_property_price.lm), We recognize that the variables mq, n_bathrooms, n_rooms and floor affect the price of property. If any variable's value changes, the price of the property will also changes.
+
+$$Property Price= 11691.33 + 332.95\times mq\ (area) + 7844.85 \times \ number \ of \ rooms   + 47185.69 \times \ number \ of \ bathroom + 4994.77 \times floor $$
+
+output from above model that was fit to a dataset with the dependent variable "price" and the independent variables "mq" (square meters), "n_rooms" (number of rooms), "n_bathrooms" (number of bathrooms), and "floor" (almost). Their individual p values are significant (less than alpha 0.05).
+
+R-squared:  0.2446
+The R-squared is the ratio of the variance in a dependent variable to that explained by the independent variable(s) in a regression model. A value of 0 indicates that the model does not explain any of the variables in the dependent variable, and a value of 1 indicates that it explains all of them.
+
+
+
+F-statistic: 72.45
+The F-statistic is a measure of the overall significance of the regression model. It is calculated as the ratio of the mean square explained by the model to its residual, or error. If the p-value is smaller than 0.05, then the relationship is considered statistically significant the model is considered to be a good fit for the data.
+
+The value of the F-statistic = 72.45 shows that it can be good fit model. 
+
+
+Overall, the R-squared value is 0.2446, the residual standard error is 88930, and the p-value for the F-statistic is less than 2.2e-16. These values suggest that the model is a good fit for the data. 
+
+
+
+
+```{r}
+plot(min_property_price.lm)
+```
+
+**Residuals vs Fitted**
+
+As data move ahead in x axis, data start bursting more and more, which indicates that relationship between the independent and dependent variables is non-linear. In this case, non-linear model would be better fit for data.
+
+
+**normal Q-Q plot (quantile-quantile plot)** 
+Normal Q-Q plot indicate that the sample is not from a population with a normal distribution. The deviation from the line may be caused by the presence of outliers or by a skewed distribution.
+
+
+**Scale Location**
+Scale-location plot indicates that the variance of the errors is not constant and that the assumption of homoscedasticity is not met. This pattern may be caused by a non-linear relationship between the independent and dependent variables or by the presence of outliers.
+
+
+**Residuals vs Leverage**
+A residuals vs leverage plot result indicates that most of the observations in the dataset are not influential and have a small leverage, while a few observations have a large leverage and may be influential. These influential observations may have a disproportionate effect on the fit of the model and may need to be carefully examined.
+
+
+
+
+\
+
+\
+
+
+\
+
+
+**Model 3**
+
+Now we will convert property price to log value to make it normalized and use it in to maximal model.
+
+```{r}
+prop_price_log.lm<-lm(log(newdf$price)~newdf$mq+newdf$n_rooms+newdf$n_bathrooms+newdf$floor+newdf$is_furnished)
+
+summary(prop_price_log.lm) #maximal if you add all coloumns except binary
+```
+Then, I will use the step function to get to our *minimal adequate model*, we do this instead of going step by step manually as we did before.
+
+```{r}
+m3_prop_price_log.lm<-step(prop_price_log.lm)
+summary(m3_prop_price_log.lm)
+```
+R-squared value = 0.184 and F-statistic = 50.44 and p-value: < 2.2e-16
+
+log(newdf$price) ~ newdf$mq + newdf$n_rooms + newdf$n_bathrooms + newdf$floor)
+
+
+$$log(Property Price) = 10.778635 + 0.001870\times mq\ (area) + 0.068663 \times \ number \ of \ rooms   + 0.285622 \times \ number \ of \ bathroom $$
+
+
+
+## 3.3 Critique model using relevant diagnostics
+
+Model 1:
+
+This model includes 5 predictor variables: mq, n_rooms, n_bathrooms, floor, and is_furnished.
+
+The R-squared value for the model 1 is 0.2448, which suggests that the model explains about 24.5% of the variance in the dependent variable newdf$price. The residual standard error for the model is 88970. A smaller residual standard error indicates a better fit of the model to the data. The p-value for the F-statistic is less than 2.2e-16, which suggests that the model is a good fit for the data.
+
+The coefficients for the predictor variables mq, n_rooms, n_bathrooms, and floor are all statistically significant (p-value < 0.05), while the coefficient for the predictor variable is_furnished is not statistically significant (p-value = 0.6825).
+
+Mode 1 Formula : 
+
+$$Price = 11691.3 + 332.9\times mq\ (area) + 7844.9 \times \ number \ of \ rooms   + 47185.7 \times \ number \ of \ bathroom   + 4994.8 \times \ number \ of \ floor  $$
+
+\
+
+
+Model 2
+
+This model includes 4 predictor variables: mq, n_rooms, n_bathrooms, and floor.
+The R-squared value for the model 2 is 0.2446, which is slightly lower than the R-squared value for Model 1. This suggests that the inclusion of the predictor variable is_furnished in Model 1 did not significantly improve the fit of the model. 
+
+The residual standard error for the model is 88930, which is slightly lower than the residual standard error for Model 1. This indicates a slightly better fit of the model to the data. value of F-statistic is  72.45 and the p-value for the F-statistic is less than 2.2e-16, which suggests that the model is a good fit for the data.
+
+The coefficients for the predictor variables mq, n_rooms, n_bathrooms, and floor are all statistically significant (p-value < 0.05).
+
+Model 2 Formula :
+
+$$Property Price= 11691.33 + 332.95\times mq\ (area) + 7844.85 \times \ number \ of \ rooms   + 47185.69 \times \ number \ of \ bathroom + 4994.77 \times floor $$
+\
+
+Model 3:
+
+This model includes 4 predictor variables: mq, n_rooms, n_bathrooms, and floor. The dependent variable in this model is the natural logarithm of price. Taking the logarithm of the dependent variable can be useful in cases where the data exhibits a skewed distribution or when the relationship between the variables is non-linear.
+
+The R-squared value for the model is 0.4624, which is higher than the R-squared values for Models 1 and 2. This suggests that the model explains a larger proportion of the variance in the dependent variable in this case. The residual standard error for the model is 0.56478. F statistics value is 50.44.
+
+Model 3 Formula :
+$$Property Price= 11691.33 + 332.95\times mq\ (area) + 7844.85 \times \ number \ of \ rooms   + 47185.69 \times \ number \ of \ bathroom + 4994.77 \times floor $$
+
+As per my opinion, Model 2 is the best model in all of 3 models. As in Model 2, it's perfect balance between R-squared value (0.2446) and F statistics 72.45 .
+
+
+/
+
+
+## 3.4 Suggest improvements to your model
+
+There are many ways to improve a model. Here are a few suggestions:
+
+Increase the sampling: Increasing the sampling is one of the best ways to enhance the performance of the model. It will aid in the normalisation of the data and allow us to lessen its skewness.
+
+
+Improve Feature selection: Along with quantity, data quality is crucial. Data scientists will have the opportunity to analyse the data in a variety of ways using various features if it has more features.
+
+
+Avoid bias in data: We should make every effort to avoid bias when collecting data.
+
+Avoid Co-Linearity: Before fitting data to a model, avoid co-linearity.
+
+Try to normalize the data: Standardize the data using different methods such as log, square root, or cube root.
+
+
+
+
+
+
+
