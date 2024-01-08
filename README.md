@@ -1,11 +1,13 @@
 
 # Property Price Prediction Project in R
 
+
 ## Introduction
 
 This project aims to predict property prices using R. It covers various steps from data organization and cleaning to exploratory data analysis (EDA) and modeling. The project utilizes R libraries like tidyverse, validate, and skimr.
 
 ## Instructions
+
 
 ## Step-by-Step Guide
 
@@ -30,6 +32,7 @@ This project aims to predict property prices using R. It covers various steps fr
 ⦁	Build multiple models to predict property prices using various explanatory variables.
 ⦁	Evaluate models and select the most appropriate one based on analysis.
 
+
 ## Project Structure
 
 ### 1.	Code Files
@@ -41,6 +44,8 @@ This project aims to predict property prices using R. It covers various steps fr
 ### 3.	Output Files
 ⦁	README.md: This document providing an overview of the project.
 ⦁	Model outputs, visualizations, and summary statistics generated during the project.
+
+
 
 ## How to Use
 
